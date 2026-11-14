@@ -146,32 +146,57 @@ function calculateAiOutagePrediction(location, totalReports = 0, noPowerReports 
     }
     finalPct = Math.max(5, Math.min(98, finalPct));
 
-    const formattedHour = hour === 0 ? "১২:০০ AM" : (hour > 12 ? `${hour - 12}:০০ PM` : (hour === 12 ? "১২:০০ PM" : `${hour}:০০ AM`));
-    const targetHourText = isCustomHour ? `${formattedHour}` : "বর্তমান সময়";
+    // সময় ফরম্যাটিং (বাংলা সংখ্যায় নিখুঁত সময়)
+    const toBn = (n) => {
+        const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+        const str = String(n < 10 ? '0' + n : n);
+        return str.replace(/[0-9]/g, d => bnDigits[d]);
+    };
+
+    let formattedHour;
+    if (hour === 0) {
+        formattedHour = "রাত ১২:০০ টা";
+    } else if (hour < 6) {
+        formattedHour = `রাত ${toBn(hour)}:০০ টা`;
+    } else if (hour < 12) {
+        formattedHour = `সকাল ${toBn(hour)}:০০ টা`;
+    } else if (hour === 12) {
+        formattedHour = "দুপুর ১২:০০ টা";
+    } else if (hour < 16) {
+        formattedHour = `দুপুর ${toBn(hour - 12)}:০০ টা`;
+    } else if (hour < 18) {
+        formattedHour = `বিকাল ${toBn(hour - 12)}:০০ টা`;
+    } else if (hour < 20) {
+        formattedHour = `সন্ধ্যা ${toBn(hour - 12)}:০০ টা`;
+    } else {
+        formattedHour = `রাত ${toBn(hour - 12)}:০০ টা`;
+    }
+
+    const targetHourText = isCustomHour ? formattedHour : "বর্তমান সময়";
 
     let riskLabel, riskColor, statusTime, duration, aiMsg;
     if (finalPct >= 75) {
         riskLabel = "উচ্চ ঝুঁকি (তীব্র লোডশেডিং)";
         riskColor = "red";
-        statusTime = isCustomHour ? `${formattedHour}-এ পিক আওয়ার` : "শিঘ্রই হতে পারে (পিক আওয়ার)";
+        statusTime = isCustomHour ? formattedHour : "শিঘ্রই হতে পারে (পিক আওয়ার)";
         duration = "১ ঘণ্টা ৩০ মিনিট";
         aiMsg = `⚠️ ${targetHourText}-এ ${profile.name} এলাকায় উচ্চ চাহিদার বিপরীতে সরবরাহে ঘাটতি থাকবে। লোডশেডিংয়ের তীব্র ঝুঁকি।`;
     } else if (finalPct >= 45) {
         riskLabel = "মাঝারি ঝুঁকি (ঘাটতি বিদ্যমান)";
         riskColor = "amber";
-        statusTime = isCustomHour ? `${formattedHour}-এ সম্ভাব্য` : "পরবর্তী ১-২ ঘণ্টার মধ্যে";
+        statusTime = isCustomHour ? formattedHour : "পরবর্তী ১-২ ঘণ্টার মধ্যে";
         duration = "৪৫ মিনিট - ১ ঘণ্টা";
-        aiMsg = `⚡ ${targetHourText}-এ ${profile.name} এলাকায় গ্রিড চাহিদা ও সরবরাহে আংশিক ভারসাম্যহীনতা থাকতে পারে। লোডশেডিং হতে পারে।`;
+        aiMsg = `⚡ ${targetHourText}-এ ${profile.name} এলাকায় গ্রিড চাহিদা ও সরবরাহে আংশিক ঘাটতি থাকতে পারে। লোডশেডিং হতে পারে।`;
     } else if (finalPct >= 25) {
         riskLabel = "কম ঝুঁকি (স্বাভাবিক সূচি)";
         riskColor = "yellow";
-        statusTime = isCustomHour ? `${formattedHour}-এ স্বাভাবিক` : "স্বাভাবিক সময়সূচী";
+        statusTime = isCustomHour ? formattedHour : "স্বাভাবিক সময়সূচী";
         duration = "০-২০ মিনিট";
         aiMsg = `ℹ️ ${targetHourText}-এ ${profile.name} এলাকায় সরকারি বিদ্যুৎ সরবরাহ ও চাহিদা প্রায় সমান থাকবে। পরিস্থিতি স্থিতিশীল।`;
     } else {
         riskLabel = "ঝুঁকি নেই (নিরাপদ / ভিআইপি)";
         riskColor = "green";
-        statusTime = isCustomHour ? `${formattedHour}-এ নিরাপদ` : "স্বাভাবিক সময়সূচী";
+        statusTime = isCustomHour ? formattedHour : "স্বাভাবিক সময়সূচী";
         duration = "০ মিনিট";
         aiMsg = `✅ ${targetHourText}-এ ${profile.name} এলাকায় সরকারি সরবরাহ চাহিদার চেয়ে পর্যাপ্ত থাকবে। লোডশেডিংয়ের কোনো ঝুঁকি নেই।`;
     }

@@ -345,31 +345,56 @@ def calculate_ai_outage_prediction(location: str, total_reports: int = 0, no_pow
 
     final_pct = max(5, min(98, final_pct))
 
+    # সময় ফরম্যাটিং (বাংলায় পরিষ্কার সময়)
+    bn_nums = {'0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪', '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯'}
+    def to_bn(n):
+        s = f"{n:02d}"
+        return "".join(bn_nums.get(c, c) for c in s)
+
+    if hour == 0:
+        formatted_hour = "রাত ১২:০০ টা"
+    elif hour < 6:
+        formatted_hour = f"রাত {to_bn(hour)}:০০ টা"
+    elif hour < 12:
+        formatted_hour = f"সকাল {to_bn(hour)}:০০ টা"
+    elif hour == 12:
+        formatted_hour = "দুপুর ১২:০০ টা"
+    elif hour < 16:
+        formatted_hour = f"দুপুর {to_bn(hour - 12)}:০০ টা"
+    elif hour < 18:
+        formatted_hour = f"বিকাল {to_bn(hour - 12)}:০০ টা"
+    elif hour < 20:
+        formatted_hour = f"সন্ধ্যা {to_bn(hour - 12)}:০০ টা"
+    else:
+        formatted_hour = f"রাত {to_bn(hour - 12)}:০০ টা"
+
+    target_hour_text = formatted_hour if is_custom_hour else "বর্তমান সময়"
+
     # স্ট্যাটাস টাইম ও বার্তা
     if final_pct >= 75:
         risk_label = "উচ্চ ঝুঁকি (তীব্র লোডশেডিং)"
         risk_color = "red"
-        status_time = "শিঘ্রই হতে পারে (পিক আওয়ার)"
+        status_time = formatted_hour if is_custom_hour else "শিঘ্রই হতে পারে (পিক আওয়ার)"
         duration = "১ ঘণ্টা ৩০ মিনিট"
-        ai_msg = f"⚠️ {profile['name']} এলাকায় উচ্চ চাহিদার বিপরীতে সরবরাহে ঘাটতি রয়েছে। লোডশেডিংয়ের তীব্র ঝুঁকি।"
+        ai_msg = f"⚠️ {target_hour_text}-এ {profile['name']} এলাকায় উচ্চ চাহিদার বিপরীতে সরবরাহে ঘাটতি থাকতে পারে। লোডশেডিংয়ের তীব্র ঝুঁকি।"
     elif final_pct >= 45:
         risk_label = "মাঝারি ঝুঁকি (ঘাটতি বিদ্যমান)"
         risk_color = "amber"
-        status_time = "পরবর্তী ১-২ ঘণ্টার মধ্যে"
+        status_time = formatted_hour if is_custom_hour else "পরবর্তী ১-২ ঘণ্টার মধ্যে"
         duration = "৪৫ মিনিট - ১ ঘণ্টা"
-        ai_msg = f"⚡ {profile['name']} এলাকায় গ্রিড চাহিদা ও সরবরাহে আংশিক ভারসাম্যহীনতা রয়েছে। লোডশেডিং হতে পারে।"
+        ai_msg = f"⚡ {target_hour_text}-এ {profile['name']} এলাকায় গ্রিড চাহিদা ও সরবরাহে আংশিক ঘাটতি দেখা যেতে পারে। লোডশেডিং হতে পারে।"
     elif final_pct >= 25:
         risk_label = "কম ঝুঁকি (স্বাভাবিক সূচি)"
         risk_color = "yellow"
-        status_time = "স্বাভাবিক সময়সূচী"
+        status_time = formatted_hour if is_custom_hour else "স্বাভাবিক সময়সূচী"
         duration = "০-২০ মিনিট"
-        ai_msg = f"ℹ️ {profile['name']} এলাকায় সরকারি বিদ্যুৎ সরবরাহ ও চাহিদা প্রায় সমান। পরিস্থিতি স্থিতিশীল।"
+        ai_msg = f"ℹ️ {target_hour_text}-এ {profile['name']} এলাকায় সরকারি বিদ্যুৎ সরবরাহ ও চাহিদা প্রায় সমান থাকবে। পরিস্থিতি স্থিতিশীল।"
     else:
         risk_label = "ঝুঁকি নেই (নিরাপদ / ভিআইপি)"
         risk_color = "green"
-        status_time = "স্বাভাবিক সময়সূচী"
+        status_time = formatted_hour if is_custom_hour else "স্বাভাবিক সময়সূচী"
         duration = "০ মিনিট"
-        ai_msg = f"✅ {profile['name']} এলাকায় সরকারি সরবরাহ চাহিদার চেয়ে পর্যাপ্ত। লোডশেডিংয়ের কোনো ঝুঁকি নেই।"
+        ai_msg = f"✅ {target_hour_text}-এ {profile['name']} এলাকায় সরকারি সরবরাহ চাহিদার চেয়ে পর্যাপ্ত থাকবে। লোডশেডিংয়ের কোনো ঝুঁকি নেই।"
 
     # লোডশেডিং স্তরের টেক্সট ও ব্যাজ কালার
     if ls <= 20:
@@ -400,7 +425,7 @@ def calculate_ai_outage_prediction(location: str, total_reports: int = 0, no_pow
         "load_shedding_text": ls_level_text,
         "ls_badge_color": ls_badge_color,
         "zone_type": profile["zone"],
-        "area_name": profile["name"]
+        "area_name": profile["name"], "target_hour_text": target_hour_text, "is_custom_hour": is_custom_hour
     }
 
 # ২. রিয়েল-টাইম AI পার্সেন্টেজ ক্যালকুলেশন API (GET)

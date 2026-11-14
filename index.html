@@ -154,27 +154,39 @@
                             <i id="aiRefreshIcon" class="fa-solid fa-arrows-rotate text-xs"></i>
                         </button>
                     </div>
+                </div>
 
-                    <!-- সময় অনুযায়ী ভবিষ্যৎ পূর্বাভাস (Time-based Prediction) -->
-                    <div class="mt-3.5 pt-3 border-t border-slate-700/60">
-                        <label for="timeSelect" class="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
-                            <span><i class="fa-regular fa-clock text-purple-400 mr-1.5"></i>পূর্বাভাসের সময় নির্বাচন:</span>
-                            <span id="forecastTimeTag" class="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">লাইভ (এখন)</span>
-                        </label>
-                        <select id="timeSelect" onchange="updateLocationData(true)"
-                            class="w-full bg-slate-900/90 border border-purple-500/30 focus:border-purple-400 rounded-xl px-3 py-2 text-xs text-white focus:outline-none transition cursor-pointer">
-                            <option value="current">⚡ বর্তমান সময় (লাইভ রিয়েল-টাইম)</option>
-                            <option value="6">🌅 সকাল ০৬:০০ টা (ভোর - কম চাহিদা)</option>
-                            <option value="9">🕘 সকাল ০৯:০০ টা (সকাল - অফিস ও বাণিজ্যিক)</option>
-                            <option value="12">🕛 দুপুর ১২:০০ টা (স্বাভাবিক সূচি)</option>
-                            <option value="14">🕑 দুপুর ০২:০০ টা (দুপুর পিক - অতিরিক্ত এসি ও ফ্যান)</option>
-                            <option value="16">🕓 বিকাল ০৪:০০ টা (বিকালে ঘাটতি)</option>
-                            <option value="18">🌆 সন্ধ্যা ০৬:০০ টা (সন্ধ্যা পিক আওয়ার শুরু)</option>
-                            <option value="20">🌃 রাত ০৮:০০ টা (সর্বোচ্চ পিক আওয়ার - বেশি লোডশেডিং)</option>
-                            <option value="22">🕙 রাত ১০:০০ টা (পিক আওয়ার সমাপ্তি)</option>
-                            <option value="0">🌙 রাত ১২:০০ টা (গভীর রাত - নিরাপদ)</option>
-                        </select>
+                <!-- ২. সময় অনুযায়ী ভবিষ্যৎ পূর্বাভাস (Time Forecast - Full Width) -->
+                <div class="bg-slate-900/70 border border-slate-700/60 rounded-xl p-3 mb-4">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <span class="text-xs font-semibold text-slate-300 flex items-center">
+                            <i class="fa-regular fa-clock text-amber-400 mr-1.5"></i> পূর্বাভাস সময় নির্বাচন:
+                        </span>
+                        <span id="forecastTimeTag" class="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">বর্তমান সময় (এখন)</span>
                     </div>
+                    <select id="timeSelect" onchange="updateLocationData(true)"
+                        class="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-3 py-2 text-xs text-amber-300 focus:outline-none transition cursor-pointer">
+                        <option value="current">⚡ বর্তমান সময় (এখন)</option>
+                        <option value="6">সকাল ০৬:০০ টা</option>
+                        <option value="7">সকাল ০৭:০০ টা</option>
+                        <option value="8">সকাল ০৮:০০ টা</option>
+                        <option value="9">সকাল ০৯:০০ টা</option>
+                        <option value="10">সকাল ১০:০০ টা</option>
+                        <option value="11">সকাল ১১:০০ টা</option>
+                        <option value="12">দুপুর ১২:০০ টা</option>
+                        <option value="13">দুপুর ০১:০০ টা</option>
+                        <option value="14">দুপুর ০২:০০ টা</option>
+                        <option value="15">দুপুর ০৩:০০ টা</option>
+                        <option value="16">বিকাল ০৪:০০ টা</option>
+                        <option value="17">বিকাল ০৫:০০ টা</option>
+                        <option value="18">সন্ধ্যা ০৬:০০ টা</option>
+                        <option value="19">সন্ধ্যা ০৭:০০ টা</option>
+                        <option value="20">রাত ০৮:০০ টা</option>
+                        <option value="21">রাত ০৯:০০ টা</option>
+                        <option value="22">রাত ১০:০০ টা</option>
+                        <option value="23">রাত ১১:০০ টা</option>
+                        <option value="0">রাত ১২:০০ টা</option>
+                    </select>
                 </div>
 
                 <div class="my-4 text-center bg-slate-900/80 p-5 rounded-xl border border-slate-700/60 shadow-inner">
@@ -434,13 +446,13 @@
             const timeTag = document.getElementById('forecastTimeTag');
             if (timeTag) {
                 if (selectedTime === 'current') {
-                    timeTag.innerText = 'লাইভ (এখন)';
+                    timeTag.innerText = 'বর্তমান সময় (এখন)';
                     timeTag.className = 'text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
                 } else {
                     const timeSelectEl = document.getElementById('timeSelect');
-                    const timeText = timeSelectEl.options[timeSelectEl.selectedIndex]?.text.split('(')[0].replace(/^[^\w\sঀ-৿]+/, '').trim();
+                    const timeText = timeSelectEl.options[timeSelectEl.selectedIndex]?.text.replace(/^[^\w\sঀ-৿]+/, '').trim();
                     timeTag.innerText = timeText || 'ভবিষ্যৎ সময়';
-                    timeTag.className = 'text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 animate-pulse';
+                    timeTag.className = 'text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40';
                 }
             }
             
