@@ -262,7 +262,7 @@ AREA_PROFILES = {
 }
 
 # Helper: AI পূর্বাভাস (RandomForest ML Model) ক্যালকুলেশন
-def calculate_ai_outage_prediction(location: str, total_reports: int = 0, no_power_reports: int = 0):
+def calculate_ai_outage_prediction(location: str, total_reports: int = 0, no_power_reports: int = 0, target_hour: Optional[int] = None):
     loc_key = (location or "tejgaon").strip().lower()
     profile = AREA_PROFILES.get(loc_key)
     if not profile:
@@ -276,30 +276,40 @@ def calculate_ai_outage_prediction(location: str, total_reports: int = 0, no_pow
         }
 
     now = datetime.now()
-    hour = now.hour
+    is_custom_hour = (target_hour is not None)
+    hour = int(target_hour) if is_custom_hour else now.hour
     day_of_week = now.weekday()
     month = now.month
 
     # পিক আওয়ার যাচাই (সন্ধ্যা ৫টা - রাত ১১টা এবং দুপুর ১টা - বিকাল ৪টা)
-    is_peak = (17 <= hour <= 23) or (13 <= hour <= 16)
+    is_evening_peak = (17 <= hour <= 23)
+    is_noon_peak = (13 <= hour <= 16)
+    is_off_peak_night = (0 <= hour <= 5)
 
     gen = profile["base_gen"]
     dem = profile["base_dem"]
     ls = profile["base_ls"]
 
     # পিক আওয়ারে অতিরিক্ত চাহিদা বৃদ্ধি ও অপ্রাধিকার এলাকায় লোডশেডিং বৃদ্ধি
-    if is_peak:
-        dem += 400.0
+    if is_evening_peak:
+        dem += 550.0
         if not profile["priority"]:
-            gen -= 250.0
-            ls = max(ls, 120.0) + 80.0
+            gen -= 300.0
+            ls = max(ls, 180.0) + 120.0
+    elif is_noon_peak:
+        dem += 350.0
+        if not profile["priority"]:
+            gen -= 150.0
+            ls = max(ls, 100.0) + 60.0
+    elif is_off_peak_night:
+        dem -= 600.0
+        ls = 0.0
     else:
-        # অফ-পিক সময়ে স্বাভাবিকতা
-        dem -= 300.0
-        ls = max(0.0, ls - 80.0)
+        dem -= 200.0
+        ls = max(0.0, ls - 60.0)
 
     # ইউজারের সাম্প্রতিক লাইভ রিপোর্ট বিবেচনা
-    if total_reports > 0:
+    if not is_custom_hour and total_reports > 0:
         ratio = no_power_reports / total_reports
         ls = max(ls, ratio * 450.0)
         if ratio > 0.5:
@@ -327,7 +337,7 @@ def calculate_ai_outage_prediction(location: str, total_reports: int = 0, no_pow
         pred = 1 if ml_prob > 50 else 0
 
     # লাইভ রিপোর্ট থাকলে ক্রাউডসোর্স ডেটা এবং ML প্রেডিকশন ব্লেন্ড করা
-    if total_reports > 0:
+    if not is_custom_hour and total_reports > 0:
         crowd_pct = (no_power_reports / total_reports) * 100.0
         final_pct = round(0.45 * ml_prob + 0.55 * crowd_pct)
     else:
@@ -395,7 +405,7 @@ def calculate_ai_outage_prediction(location: str, total_reports: int = 0, no_pow
 
 # ২. রিয়েল-টাইম AI পার্সেন্টেজ ক্যালকুলেশন API (GET)
 @app.get("/api/outage-stats/{location}")
-def get_location_outage_stats(location: str):
+def get_location_outage_stats(location: str, hour: Optional[int] = Query(None, description="টার্গেট সময় (0-23)")):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -427,7 +437,7 @@ def get_location_outage_stats(location: str):
         no_power_reports = result[1] if (result and result[1] is not None) else 0
         
         # AI ML মডেল দিয়ে আসল রিয়েল-টাইম পূর্বাভাস হিসাব
-        ai_res = calculate_ai_outage_prediction(location, total_reports, no_power_reports)
+        ai_res = calculate_ai_outage_prediction(location, total_reports, no_power_reports, target_hour=hour)
         
         return {
             "success": True,

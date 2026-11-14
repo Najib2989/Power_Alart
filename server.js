@@ -67,7 +67,7 @@ const AREA_PROFILES = {
 };
 
 // AI & Grid Calculation Helper
-function calculateAiOutagePrediction(location, totalReports = 0, noPowerReports = 0) {
+function calculateAiOutagePrediction(location, totalReports = 0, noPowerReports = 0, targetHour = null) {
     const locKey = (location || "tejgaon").trim().toLowerCase();
     let profile = AREA_PROFILES[locKey];
     if (!profile) {
@@ -82,25 +82,40 @@ function calculateAiOutagePrediction(location, totalReports = 0, noPowerReports 
     }
 
     const now = new Date();
-    const hour = now.getHours();
-    const isPeak = (hour >= 17 && hour <= 23) || (hour >= 13 && hour <= 16);
+    const isCustomHour = (targetHour !== null && targetHour !== undefined && targetHour !== '' && targetHour !== 'current');
+    const hour = isCustomHour ? parseInt(targetHour, 10) : now.getHours();
+
+    // পিক আওয়ার যাচাই (সন্ধ্যা ৫টা - রাত ১১টা এবং দুপুর ১টা - বিকাল ৪টা)
+    const isEveningPeak = (hour >= 17 && hour <= 23);
+    const isNoonPeak = (hour >= 13 && hour <= 16);
+    const isOffPeakNight = (hour >= 0 && hour <= 5);
 
     let gen = profile.base_gen;
     let dem = profile.base_dem;
     let ls = profile.base_ls;
 
-    if (isPeak) {
-        dem += 400.0;
+    // সময়ভেদে বিদ্যুৎ চাহিদা ও লোডশেডিং তারতম্য
+    if (isEveningPeak) {
+        dem += 550.0;
         if (!profile.priority) {
-            gen -= 250.0;
-            ls = Math.max(ls, 120.0) + 80.0;
+            gen -= 300.0;
+            ls = Math.max(ls, 180.0) + 120.0;
         }
+    } else if (isNoonPeak) {
+        dem += 350.0;
+        if (!profile.priority) {
+            gen -= 150.0;
+            ls = Math.max(ls, 100.0) + 60.0;
+        }
+    } else if (isOffPeakNight) {
+        dem -= 600.0;
+        ls = 0.0;
     } else {
-        dem -= 300.0;
-        ls = Math.max(0.0, ls - 80.0);
+        dem -= 200.0;
+        ls = Math.max(0.0, ls - 60.0);
     }
 
-    if (totalReports > 0) {
+    if (!isCustomHour && totalReports > 0) {
         const ratio = noPowerReports / totalReports;
         ls = Math.max(ls, ratio * 450.0);
         if (ratio > 0.5) {
@@ -123,7 +138,7 @@ function calculateAiOutagePrediction(location, totalReports = 0, noPowerReports 
     }
 
     let finalPct;
-    if (totalReports > 0) {
+    if (!isCustomHour && totalReports > 0) {
         const crowdPct = (noPowerReports / totalReports) * 100.0;
         finalPct = Math.round(0.45 * mlProb + 0.55 * crowdPct);
     } else {
@@ -131,31 +146,34 @@ function calculateAiOutagePrediction(location, totalReports = 0, noPowerReports 
     }
     finalPct = Math.max(5, Math.min(98, finalPct));
 
+    const formattedHour = hour === 0 ? "১২:০০ AM" : (hour > 12 ? `${hour - 12}:০০ PM` : (hour === 12 ? "১২:০০ PM" : `${hour}:০০ AM`));
+    const targetHourText = isCustomHour ? `${formattedHour}` : "বর্তমান সময়";
+
     let riskLabel, riskColor, statusTime, duration, aiMsg;
     if (finalPct >= 75) {
         riskLabel = "উচ্চ ঝুঁকি (তীব্র লোডশেডিং)";
         riskColor = "red";
-        statusTime = "শিঘ্রই হতে পারে (পিক আওয়ার)";
+        statusTime = isCustomHour ? `${formattedHour}-এ পিক আওয়ার` : "শিঘ্রই হতে পারে (পিক আওয়ার)";
         duration = "১ ঘণ্টা ৩০ মিনিট";
-        aiMsg = `⚠️ ${profile.name} এলাকায় উচ্চ চাহিদার বিপরীতে সরবরাহে ঘাটতি রয়েছে। লোডশেডিংয়ের তীব্র ঝুঁকি।`;
+        aiMsg = `⚠️ ${targetHourText}-এ ${profile.name} এলাকায় উচ্চ চাহিদার বিপরীতে সরবরাহে ঘাটতি থাকবে। লোডশেডিংয়ের তীব্র ঝুঁকি।`;
     } else if (finalPct >= 45) {
         riskLabel = "মাঝারি ঝুঁকি (ঘাটতি বিদ্যমান)";
         riskColor = "amber";
-        statusTime = "পরবর্তী ১-২ ঘণ্টার মধ্যে";
+        statusTime = isCustomHour ? `${formattedHour}-এ সম্ভাব্য` : "পরবর্তী ১-২ ঘণ্টার মধ্যে";
         duration = "৪৫ মিনিট - ১ ঘণ্টা";
-        aiMsg = `⚡ ${profile.name} এলাকায় গ্রিড চাহিদা ও সরবরাহে আংশিক ভারসাম্যহীনতা রয়েছে। লোডশেডিং হতে পারে।`;
+        aiMsg = `⚡ ${targetHourText}-এ ${profile.name} এলাকায় গ্রিড চাহিদা ও সরবরাহে আংশিক ভারসাম্যহীনতা থাকতে পারে। লোডশেডিং হতে পারে।`;
     } else if (finalPct >= 25) {
         riskLabel = "কম ঝুঁকি (স্বাভাবিক সূচি)";
         riskColor = "yellow";
-        statusTime = "স্বাভাবিক সময়সূচী";
+        statusTime = isCustomHour ? `${formattedHour}-এ স্বাভাবিক` : "স্বাভাবিক সময়সূচী";
         duration = "০-২০ মিনিট";
-        aiMsg = `ℹ️ ${profile.name} এলাকায় সরকারি বিদ্যুৎ সরবরাহ ও চাহিদা প্রায় সমান। পরিস্থিতি স্থিতিশীল।`;
+        aiMsg = `ℹ️ ${targetHourText}-এ ${profile.name} এলাকায় সরকারি বিদ্যুৎ সরবরাহ ও চাহিদা প্রায় সমান থাকবে। পরিস্থিতি স্থিতিশীল।`;
     } else {
         riskLabel = "ঝুঁকি নেই (নিরাপদ / ভিআইপি)";
         riskColor = "green";
-        statusTime = "স্বাভাবিক সময়সূচী";
+        statusTime = isCustomHour ? `${formattedHour}-এ নিরাপদ` : "স্বাভাবিক সময়সূচী";
         duration = "০ মিনিট";
-        aiMsg = `✅ ${profile.name} এলাকায় সরকারি সরবরাহ চাহিদার চেয়ে পর্যাপ্ত। লোডশেডিংয়ের কোনো ঝুঁকি নেই।`;
+        aiMsg = `✅ ${targetHourText}-এ ${profile.name} এলাকায় সরকারি সরবরাহ চাহিদার চেয়ে পর্যাপ্ত থাকবে। লোডশেডিংয়ের কোনো ঝুঁকি নেই।`;
     }
 
     let lsLevelText, lsBadgeColor;
@@ -262,6 +280,7 @@ app.get('/api/ai-status', (req, res) => {
 // এলাকাভিত্তিক রিয়েল-টাইম AI পূর্বাভাস ও গ্রিড স্ট্যাটাস API (GET)
 app.get('/api/outage-stats/:location', async (req, res) => {
     const location = req.params.location;
+    const targetHour = req.query.hour !== undefined ? req.query.hour : null;
     let totalReports = 0;
     let noPowerReports = 0;
 
@@ -285,7 +304,7 @@ app.get('/api/outage-stats/:location', async (req, res) => {
         }
     }
 
-    const aiRes = calculateAiOutagePrediction(location, totalReports, noPowerReports);
+    const aiRes = calculateAiOutagePrediction(location, totalReports, noPowerReports, targetHour);
 
     const nowStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
@@ -309,12 +328,16 @@ app.get('/api/outage-stats/:location', async (req, res) => {
         load_shedding_text: aiRes.load_shedding_text,
         ls_badge_color: aiRes.ls_badge_color,
         ai_message: aiRes.message,
+        target_hour_text: aiRes.target_hour_text,
+        is_custom_hour: aiRes.is_custom_hour,
+        target_hour: aiRes.target_hour,
         ai_details: {
             model: "RandomForest (pkl)",
             ml_probability: aiRes.ml_prob,
             generation_mw: aiRes.generation_mw,
             demand_mw: aiRes.demand_mw,
             load_shedding_mw: aiRes.load_shedding,
+            target_time: aiRes.target_hour_text,
             timestamp: nowStr
         }
     });
